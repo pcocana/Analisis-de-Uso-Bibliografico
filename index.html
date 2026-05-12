@@ -239,6 +239,30 @@ tbody td.zero{color:#C0C8DB;}
       </div>
     </div>
 
+    <!-- KPIs disponibilidad (se muestra solo si hay datos de UA/OUA) -->
+    <div class="kpi-grid" id="kpiDisp" style="display:none;">
+      <div class="kpi kpi-red">
+        <div class="kpi-val" id="kDispSinUso">—</div>
+        <div class="kpi-lbl">En biblioteca · sin préstamos</div>
+        <div class="kpi-sub" id="kDispSinUsoSub">Disponibles en UA pero sin uso</div>
+      </div>
+      <div class="kpi" style="border-left:3px solid var(--gold);">
+        <div class="kpi-val" id="kSoloOUA">—</div>
+        <div class="kpi-lbl">Solo otras bibliotecas</div>
+        <div class="kpi-sub">Sin ejemplar en UA</div>
+      </div>
+      <div class="kpi kpi-red">
+        <div class="kpi-val" id="kSinDisp">—</div>
+        <div class="kpi-lbl">Sin disponibilidad</div>
+        <div class="kpi-sub">Posible adquisición</div>
+      </div>
+      <div class="kpi kpi-blue">
+        <div class="kpi-val" id="kConUsoUA">—</div>
+        <div class="kpi-lbl">Con préstamos · en UA</div>
+        <div class="kpi-sub" id="kConUsoUASub">Disponibles y en uso</div>
+      </div>
+    </div>
+
     <!-- Barra de cobertura -->
     <div class="cobertura-bar">
       <h3>Cobertura de la bibliografía</h3>
@@ -278,7 +302,7 @@ tbody td.zero{color:#C0C8DB;}
       <table>
         <thead><tr>
           <th>Referencia bibliográfica</th><th>Tipo</th>
-          <th class="num">UA</th><th class="num">OUA</th>
+          <th class="num">UA</th><th class="num">OUA</th><th>Disponibilidad</th>
         </tr></thead>
         <tbody id="sinUsoBody"></tbody>
       </table>
@@ -405,20 +429,32 @@ function _analizar() {
   const umbral = parseInt(document.getElementById('umbral').value) / 100;
   const modoAmplio = document.querySelector('input[name="modo"]:checked').value === 'amplio';
 
-  // ── Leer bibliografía (solo libros: col F vacía) ──────────────
+  // ── Leer bibliografía ────────────────────────────────────────
   const wsBib = S.bib.Sheets[S.bib.SheetNames[0]];
   const rawBib = XLSX.utils.sheet_to_json(wsBib, { header:1, defval:null });
-  // Formato planilla limpia: [tipo, ref, UA, OUA, online, articulo, obs]
+
+  // Detectar formato: tabla completa (Clave,Nombre,Tipo,Ref en col D)
+  //                   o simplificado (Tipo,Ref en col B)
+  const _h0 = (rawBib[0] || []).map(c => String(c||'').toLowerCase());
+  const esFmtTabla = _h0.some(c => c.includes('clave') || c.includes('nombre asignatura'));
+  const bRef  = esFmtTabla ? 3 : 1;
+  const bTipo = esFmtTabla ? 2 : 0;
+  const bUA   = esFmtTabla ? 4 : 2;
+  const bOUA  = esFmtTabla ? 5 : 3;
+  const bOnl  = esFmtTabla ? 7 : 4;
+  const bArt  = esFmtTabla ? 8 : 5;
+  const bObs  = esFmtTabla ? 9 : 6;
+
   const libros = rawBib.slice(1)
-    .filter(r => r[1] && String(r[1]).trim())
-    .filter(r => !r[5] || !String(r[5]).trim()) // col F vacía = libro
+    .filter(r => r[bRef] && String(r[bRef]).trim().length > 10)
+    .filter(r => !r[bArt] || !String(r[bArt]).trim())
     .map(r => ({
-      tipo: String(r[0] || '').trim(),
-      ref:  String(r[1] || '').trim(),
-      ua:   parseFloat(r[2]) || 0,
-      oua:  parseFloat(r[3]) || 0,
-      online: r[4] ? String(r[4]).trim() : '',
-      obs:    r[6] ? String(r[6]).trim() : '',
+      tipo: String(r[bTipo] || '').trim(),
+      ref:  String(r[bRef]  || '').trim(),
+      ua:   parseFloat((String(r[bUA]  || '').replace(/[^\d.]/g,' ')).trim().split(' ')[0]) || 0,
+      oua:  parseFloat((String(r[bOUA] || '').replace(/[^\d.]/g,' ')).trim().split(' ')[0]) || 0,
+      online: r[bOnl] ? String(r[bOnl]).trim() : '',
+      obs:    r[bObs] ? String(r[bObs]).trim() : '',
       prestamos: 0,
       matchKoha: '',
     }));
@@ -486,6 +522,12 @@ function _analizar() {
   // ── Indicadores ───────────────────────────────────────────────
   const conUso   = libros.filter(l => l.prestamos > 0);
   const sinUso   = libros.filter(l => l.prestamos === 0);
+
+  // Clasificar libros sin préstamos según disponibilidad
+  const dispSinUso   = sinUso.filter(l => l.ua > 0);           // En UA, sin préstamos
+  const soloOUA      = sinUso.filter(l => l.ua === 0 && l.oua > 0); // Solo otras btcas
+  const sinDisp      = sinUso.filter(l => l.ua === 0 && l.oua === 0 && !l.online); // Sin disponibilidad
+  const hayDisp      = libros.some(l => l.ua > 0 || l.oua > 0); // ¿Hay datos de disponibilidad?
   const noMatch  = kohaEntries.filter(ke => !ke.matched).sort((a,b) => b.count - a.count);
   const totalPrest = libros.reduce((s, l) => s + l.prestamos, 0);
   const pctCob   = libros.length ? (conUso.length / libros.length * 100).toFixed(1) : 0;
@@ -505,6 +547,19 @@ function _analizar() {
   document.getElementById('kPromSub').textContent = 'Promedio préstamos por libro bibliografía';
   document.getElementById('kSinUso').textContent = sinUso.length;
   document.getElementById('kSinUsoSub').textContent = `${(sinUso.length/libros.length*100).toFixed(1)}% del total sin registro`;
+
+  // KPIs de disponibilidad (solo si la planilla tiene datos de UA/OUA)
+  if (hayDisp) {
+    document.getElementById('kpiDisp').style.display = 'grid';
+    const conUsoUA = conUso.filter(l => l.ua > 0);
+    document.getElementById('kDispSinUso').textContent = dispSinUso.length;
+    document.getElementById('kDispSinUsoSub').textContent = dispSinUso.length === 0
+      ? 'Todos los disponibles tienen uso' : `${dispSinUso.length} libros con ejemplares sin préstamos`;
+    document.getElementById('kSoloOUA').textContent = soloOUA.length;
+    document.getElementById('kSinDisp').textContent = sinDisp.length;
+    document.getElementById('kConUsoUA').textContent = conUsoUA.length;
+    document.getElementById('kConUsoUASub').textContent = `${conUsoUA.length} de ${libros.filter(l=>l.ua>0).length} con ejemplares en UA`;
+  }
 
   // ── Barra cobertura ───────────────────────────────────────────
   document.getElementById('barFill').style.width  = pctCob + '%';
@@ -532,11 +587,23 @@ function _analizar() {
   tbody2.innerHTML = '';
   sinUso.slice(0, 30).forEach(l => {
     const tr = document.createElement('tr');
+    let dispBadge = '';
+    if (hayDisp) {
+      if (l.ua > 0)
+        dispBadge = `<span class="badge" style="background:#FEF9C3;color:#854d0e;">En UA · sin uso</span>`;
+      else if (l.oua > 0)
+        dispBadge = `<span class="badge badge-gray">Solo otras Btcas</span>`;
+      else if (l.online)
+        dispBadge = `<span class="badge badge-gray">Online</span>`;
+      else
+        dispBadge = `<span class="badge" style="background:#FEE2E2;color:#991b1b;">Sin disponibilidad</span>`;
+    }
     tr.innerHTML = `
       <td>${l.ref.substring(0,90)}${l.ref.length>90?'…':''}</td>
-      <td><span class="badge ${l.tipo==='obligatoria'?'badge-green':'badge-gray'}">${l.tipo||'—'}</span></td>
+      <td><span class="badge ${l.tipo.toLowerCase().includes('oblig')?'badge-green':'badge-gray'}">${l.tipo||'—'}</span></td>
       <td class="num zero">${l.ua||0}</td>
-      <td class="num zero">${l.oua||0}</td>`;
+      <td class="num zero">${l.oua||0}</td>
+      <td>${dispBadge}</td>`;
     tbody2.appendChild(tr);
   });
   if (sinUso.length > 30) {
@@ -588,9 +655,16 @@ function exportar() {
   const wb = XLSX.utils.book_new();
 
   // Hoja 1: todos los libros con préstamos
-  const h1 = [['Tipo','Referencia','UA','OUA','Préstamos','Match KOHA']];
-  libros.sort((a,b) => b.prestamos - a.prestamos).forEach(l =>
-    h1.push([l.tipo, l.ref, l.ua, l.oua, l.prestamos, l.matchKoha]));
+  const h1 = [['Tipo','Referencia','UA','OUA','Préstamos','Match KOHA','Disponibilidad']];
+  libros.sort((a,b) => b.prestamos - a.prestamos).forEach(l => {
+    let disp = '';
+    if (l.prestamos > 0) disp = 'Con préstamos';
+    else if (l.ua > 0)   disp = 'En UA · sin uso';
+    else if (l.oua > 0)  disp = 'Solo otras Btcas';
+    else if (l.online)   disp = 'Online';
+    else                 disp = 'Sin disponibilidad';
+    h1.push([l.tipo, l.ref, l.ua, l.oua, l.prestamos, l.matchKoha, disp]);
+  });
   const ws1 = XLSX.utils.aoa_to_sheet(h1);
   ws1['!cols'] = [{wch:15},{wch:80},{wch:6},{wch:6},{wch:12},{wch:50}];
   XLSX.utils.book_append_sheet(wb, ws1, 'Uso_por_libro');
