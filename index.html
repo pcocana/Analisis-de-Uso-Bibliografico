@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Análisis de Uso Bibliográfico · Biblioteca PUCV</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@600;700&display=swap');
+:root {
+  --navy:#002D5C;--navy2:#003F7F;--gold:#C9A84C;--gold2:#E8C97A;
+  --white:#FFFFFF;--bg:#F5F6F8;--card:#FFFFFF;--bord:#DDE1E9;
+  --text:#1A2236;--muted:#6B7A99;--green:#1A7F4B;--red:#C0392B;--amber:#B45309;
+  --ok-bg:#ECFDF5;--ok-bord:#6EE7B7;--wa-bg:#FFFBEB;--wa-bord:#FCD34D;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+header{background:var(--navy);position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(0,0,0,.25);}
+.hdr{max-width:1100px;margin:0 auto;padding:16px 32px;display:flex;align-items:center;gap:18px;}
+.hdr-logo{width:40px;height:40px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;}
+.hdr-title h1{font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;color:#fff;}
+.hdr-title p{font-size:.72rem;color:var(--gold2);margin-top:2px;}
+.hdr-badge{margin-left:auto;background:rgba(201,168,76,.18);border:1px solid rgba(201,168,76,.4);color:var(--gold2);font-size:.68rem;font-family:'DM Mono',monospace;padding:4px 10px;border-radius:20px;}
+main{max-width:1100px;margin:0 auto;padding:28px 32px 60px;}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
+.step-card{background:var(--card);border:1.5px solid var(--bord);border-radius:14px;padding:20px;transition:border-color .2s;}
+.step-card.active{border-color:var(--navy2);box-shadow:0 4px 20px rgba(0,45,92,.1);}
+.step-card.done{border-color:var(--green);}
+.step-num{width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;font-size:.75rem;font-weight:600;display:flex;align-items:center;justify-content:center;margin-bottom:9px;}
+.step-card.done .step-num{background:var(--green);}
+.step-card h2{font-size:.85rem;font-weight:600;color:var(--navy);margin-bottom:4px;}
+.step-card p{font-size:.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px;}
+.dropzone{border:2px dashed var(--bord);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;background:var(--bg);position:relative;}
+.dropzone:hover,.dropzone.drag-over{border-color:var(--navy2);background:#EEF2FA;}
+.dropzone.loaded{border-color:var(--green);background:var(--ok-bg);}
+.dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.dz-icon{font-size:1.4rem;margin-bottom:4px;}
+.dz-label{font-size:.74rem;color:var(--muted);font-weight:500;}
+.dropzone.loaded .dz-label{color:var(--green);font-weight:600;}
+.dz-name{font-family:'DM Mono',monospace;font-size:.68rem;color:var(--green);margin-top:3px;word-break:break-all;}
+/* Modo selector */
+.modo-sel{background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:16px 20px;margin-bottom:18px;display:flex;gap:14px;align-items:flex-start;}
+.modo-sel h3{font-size:.82rem;font-weight:600;color:var(--navy);margin-bottom:10px;grid-column:1/-1;}
+.modo-wrap{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;}
+.modo-opt{border:1.5px solid var(--bord);border-radius:10px;padding:14px;cursor:pointer;transition:border-color .2s,background .2s;}
+.modo-opt:hover{border-color:var(--navy2);background:#EEF2FA;}
+.modo-opt.selected{border-color:var(--navy);background:#EEF2FA;}
+.modo-opt input{margin-right:8px;accent-color:var(--navy);}
+.modo-opt label{font-size:.82rem;font-weight:600;color:var(--navy);cursor:pointer;}
+.modo-opt p{font-size:.72rem;color:var(--muted);margin-top:4px;line-height:1.4;}
+/* Umbral */
+.umbral-wrap{background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:14px 20px;margin-bottom:18px;display:flex;align-items:center;gap:16px;}
+.umbral-wrap label{font-size:.82rem;font-weight:600;color:var(--navy);min-width:180px;}
+.umbral-wrap input[type=range]{flex:1;accent-color:var(--navy);}
+.umbral-val{font-family:'DM Mono',monospace;font-size:.82rem;color:var(--navy);font-weight:600;min-width:36px;text-align:right;}
+.umbral-desc{font-size:.72rem;color:var(--muted);}
+/* Botón */
+.btn-run{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px;background:var(--navy);color:#fff;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:.92rem;font-weight:600;cursor:pointer;transition:background .2s;margin-bottom:22px;}
+.btn-run:hover:not(:disabled){background:var(--navy2);}
+.btn-run:disabled{opacity:.4;cursor:not-allowed;}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none;}
+.btn-run.loading .spinner{display:block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+/* Alertas */
+.alert{border-radius:10px;padding:12px 16px;font-size:.8rem;line-height:1.6;margin-bottom:14px;display:none;}
+.alert.show{display:block;}
+.alert strong{font-weight:600;display:block;margin-bottom:3px;}
+.a-ok{background:var(--ok-bg);border:1px solid var(--ok-bord);color:var(--green);}
+.a-warn{background:var(--wa-bg);border:1px solid var(--wa-bord);color:var(--amber);}
+/* Resultados */
+#results{display:none;}
+#results.show{display:block;}
+.res-hdr{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.res-hdr h2{font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--navy);}
+.res-meta{font-size:.74rem;color:var(--muted);font-family:'DM Mono',monospace;}
+/* KPIs */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px;}
+.kpi{background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:15px 16px;position:relative;overflow:hidden;}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold);}
+.kpi.kpi-green::before{background:var(--green);}
+.kpi.kpi-red::before{background:var(--red);}
+.kpi.kpi-blue::before{background:#6366F1;}
+.kpi-val{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:var(--navy);line-height:1;margin-bottom:4px;}
+.kpi-lbl{font-size:.68rem;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;}
+.kpi-sub{font-size:.66rem;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace;}
+/* Barra de cobertura */
+.cobertura-bar{background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:18px 20px;margin-bottom:20px;}
+.cobertura-bar h3{font-size:.82rem;font-weight:600;color:var(--navy);margin-bottom:12px;}
+.bar-wrap{display:flex;align-items:center;gap:12px;}
+.bar-bg{flex:1;height:18px;background:#EEF2FA;border-radius:9px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:9px;transition:width .8s ease;}
+.bar-pct{font-family:'DM Mono',monospace;font-size:.85rem;font-weight:700;min-width:52px;text-align:right;}
+/* Tablas */
+.sec-lbl{font-size:.68rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin:20px 0 10px;display:flex;align-items:center;gap:8px;}
+.sec-lbl::after{content:'';flex:1;height:1px;background:var(--bord);}
+.tbl-card{background:var(--card);border:1.5px solid var(--bord);border-radius:14px;overflow:hidden;margin-bottom:18px;}
+.tbl-hdr{background:var(--navy);color:#fff;padding:11px 18px;font-size:.8rem;font-weight:600;letter-spacing:.04em;}
+.tbl-hdr span{color:var(--gold2);}
+table{width:100%;border-collapse:collapse;font-size:.78rem;}
+thead th{background:#F0F3FA;color:var(--navy);font-weight:600;padding:8px 14px;text-align:left;border-bottom:2px solid var(--bord);font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;}
+thead th.num{text-align:right;}
+tbody tr{border-bottom:1px solid #F0F3FA;}
+tbody tr:hover{background:#F8F9FC;}
+tbody td{padding:8px 14px;color:var(--text);}
+tbody td.num{text-align:right;font-family:'DM Mono',monospace;}
+tbody td.zero{color:#C0C8DB;}
+.badge{display:inline-block;font-size:.62rem;padding:2px 7px;border-radius:10px;font-weight:600;}
+.badge-green{background:#DCFCE7;color:var(--green);}
+.badge-red{background:#FEE2E2;color:var(--red);}
+.badge-gray{background:#F1F5F9;color:var(--muted);}
+/* Botón descarga */
+.btn-dl{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:var(--green);color:#fff;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:.88rem;font-weight:600;cursor:pointer;transition:background .2s;margin-top:6px;}
+.btn-dl:hover{background:#156940;}
+@media(max-width:700px){.steps,.kpi-grid,.modo-wrap{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <div class="hdr-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#002D5C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+    </div>
+    <div class="hdr-title">
+      <h1>Análisis de Uso Bibliográfico · Biblioteca PUCV</h1>
+      <p>Cruce planilla de referencias limpia × informe de préstamos KOHA</p>
+    </div>
+    <div class="hdr-badge">v1.0</div>
+  </div>
+</header>
+
+<main>
+  <!-- PASO 1-3: Carga de archivos -->
+  <div class="steps">
+    <div class="step-card active" id="card1">
+      <div class="step-num">1</div>
+      <h2>Planilla limpia</h2>
+      <p>Archivo .xlsx generado por el módulo de revisión bibliográfica. Solo se consideran los libros (columna F vacía).</p>
+      <div class="dropzone" id="dz1">
+        <input type="file" accept=".xlsx" onchange="cargar(event,'bib')">
+        <div class="dz-icon">📋</div>
+        <div class="dz-label">Arrastra o haz clic</div>
+        <div class="dz-name" id="nm1"></div>
+      </div>
+    </div>
+    <div class="step-card" id="card2">
+      <div class="step-num">2</div>
+      <h2>Informe KOHA</h2>
+      <p>Excel exportado de KOHA con columnas: Unidad Académica, Carrera, Transacción, Signatura, Título, Autor, Tipo de ítem.</p>
+      <div class="dropzone" id="dz2">
+        <input type="file" accept=".xlsx,.xls,.csv" onchange="cargar(event,'koha')">
+        <div class="dz-icon">📊</div>
+        <div class="dz-label">Arrastra o haz clic</div>
+        <div class="dz-name" id="nm2"></div>
+      </div>
+    </div>
+    <div class="step-card" id="card3">
+      <div class="step-num">3</div>
+      <h2>Resumen de carga</h2>
+      <p>Una vez cargados ambos archivos se muestra aquí el conteo de registros disponibles para el análisis.</p>
+      <div id="resumenCarga" style="font-size:.76rem;color:var(--muted);margin-top:4px;">Esperando archivos…</div>
+    </div>
+  </div>
+
+  <!-- MODO DE ANÁLISIS -->
+  <div class="modo-sel">
+    <div style="width:100%">
+      <h3>Modo de análisis</h3>
+      <div class="modo-wrap">
+        <div class="modo-opt selected" onclick="selModo('especifico',this)">
+          <input type="radio" name="modo" id="mEsp" value="especifico" checked>
+          <label for="mEsp">Específico por carrera</label>
+          <p>Cruza solo los préstamos de la carrera del programa analizado con su bibliografía. Refleja el uso real del programa.</p>
+        </div>
+        <div class="modo-opt" onclick="selModo('amplio',this)">
+          <input type="radio" name="modo" id="mAmp" value="amplio">
+          <label for="mAmp">Colección y préstamos totales</label>
+          <p>Usa todos los préstamos y toda la colección disponible. Indicadores más amplios, útil para acreditación cuando los números específicos son bajos.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UMBRAL DE SIMILITUD -->
+  <div class="umbral-wrap">
+    <label>Umbral de similitud para match</label>
+    <input type="range" id="umbral" min="30" max="90" value="45" step="5"
+      oninput="document.getElementById('umbralVal').textContent=this.value+'%'">
+    <span class="umbral-val" id="umbralVal">45%</span>
+    <span class="umbral-desc">Mayor umbral = menos matches pero más precisos · Menor umbral = más matches pero puede haber falsos positivos</span>
+  </div>
+
+  <!-- PERÍODO -->
+  <div class="umbral-wrap" style="gap:12px;">
+    <label>Período del informe</label>
+    <input type="text" id="inputPeriodo" placeholder="Ej. 2023–2025" value="2023–2025"
+      style="flex:1;padding:7px 12px;border:1.5px solid var(--bord);border-radius:8px;font-size:.84rem;background:var(--card);color:var(--navy);">
+    <span class="umbral-desc">Se incluye en el nombre del archivo exportado y en los resultados</span>
+  </div>
+
+  <!-- BOTÓN PROCESAR -->
+  <button class="btn-run" id="btnRun" onclick="analizar()" disabled>
+    <div class="spinner"></div>
+    <span>🔍 Analizar uso bibliográfico</span>
+  </button>
+
+  <div class="alert a-ok"  id="aOk"></div>
+  <div class="alert a-warn" id="aWarn"></div>
+
+  <!-- RESULTADOS -->
+  <div id="results">
+    <div class="res-hdr">
+      <h2>Resultados del análisis</h2>
+      <div class="res-meta" id="resMeta"></div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi kpi-green">
+        <div class="kpi-val" id="kCob">—</div>
+        <div class="kpi-lbl">Cobertura de uso</div>
+        <div class="kpi-sub" id="kCobSub"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" id="kPrest">—</div>
+        <div class="kpi-lbl">Total préstamos</div>
+        <div class="kpi-sub" id="kPrestSub"></div>
+      </div>
+      <div class="kpi kpi-blue">
+        <div class="kpi-val" id="kProm">—</div>
+        <div class="kpi-lbl">Promedio préstamos/libro</div>
+        <div class="kpi-sub" id="kPromSub"></div>
+      </div>
+      <div class="kpi kpi-red">
+        <div class="kpi-val" id="kSinUso">—</div>
+        <div class="kpi-lbl">Sin uso registrado</div>
+        <div class="kpi-sub" id="kSinUsoSub"></div>
+      </div>
+    </div>
+
+    <!-- Barra de cobertura -->
+    <div class="cobertura-bar">
+      <h3>Cobertura de la bibliografía</h3>
+      <div class="bar-wrap">
+        <span style="font-size:.72rem;color:var(--muted);min-width:80px">Con préstamos</span>
+        <div class="bar-bg">
+          <div class="bar-fill" id="barFill" style="width:0%;background:var(--green)"></div>
+        </div>
+        <span class="bar-pct" id="barPct" style="color:var(--green)">—</span>
+      </div>
+      <div class="bar-wrap" style="margin-top:8px;">
+        <span style="font-size:.72rem;color:var(--muted);min-width:80px">Sin préstamos</span>
+        <div class="bar-bg">
+          <div class="bar-fill" id="barFill2" style="width:0%;background:#FCA5A5"></div>
+        </div>
+        <span class="bar-pct" id="barPct2" style="color:var(--red)">—</span>
+      </div>
+    </div>
+
+    <!-- Top libros más prestados -->
+    <div class="sec-lbl">Libros de bibliografía más prestados</div>
+    <div class="tbl-card">
+      <div class="tbl-hdr">Top libros <span>· ordenados por número de préstamos</span></div>
+      <table>
+        <thead><tr>
+          <th>#</th><th>Referencia bibliográfica</th><th>Tipo</th>
+          <th class="num">Préstamos</th><th class="num">UA</th>
+        </tr></thead>
+        <tbody id="topBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Libros sin uso -->
+    <div class="sec-lbl">Libros disponibles sin préstamos registrados</div>
+    <div class="tbl-card">
+      <div class="tbl-hdr">Sin uso <span>· disponibles en bibliografía pero sin préstamos en el período</span></div>
+      <table>
+        <thead><tr>
+          <th>Referencia bibliográfica</th><th>Tipo</th>
+          <th class="num">UA</th><th class="num">OUA</th>
+        </tr></thead>
+        <tbody id="sinUsoBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Préstamos KOHA no emparejados -->
+    <div class="sec-lbl">Préstamos KOHA sin match en bibliografía</div>
+    <div class="tbl-card">
+      <div class="tbl-hdr">No emparejados <span>· libros prestados que no están en la bibliografía del programa</span></div>
+      <table>
+        <thead><tr>
+          <th>Título (KOHA)</th><th>Autor</th><th class="num">Préstamos</th>
+        </tr></thead>
+        <tbody id="noMatchBody"></tbody>
+      </table>
+    </div>
+
+    <button class="btn-dl" onclick="exportar()">⬇ Exportar informe de uso (.xlsx)</button>
+  </div>
+</main>
+
+<script>
+const S = { bib: null, koha: null };
+
+// ─── Carga de archivos ───────────────────────────────────────────
+function cargar(e, tipo) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const ab = ev.target.result;
+    const wb = XLSX.read(ab, { type: 'array' });
+    if (tipo === 'bib') {
+      S.bib = wb;
+      document.getElementById('nm1').textContent = file.name;
+      activar('dz1','card1');
+    } else {
+      S.koha = wb;
+      document.getElementById('nm2').textContent = file.name;
+      activar('dz2','card2');
+    }
+    actualizarResumen();
+    document.getElementById('btnRun').disabled = !(S.bib && S.koha);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function activar(dzId, cardId) {
+  document.getElementById(dzId).classList.add('loaded');
+  document.getElementById(dzId).querySelector('.dz-label').textContent = 'Cargado ✓';
+  document.getElementById(cardId).classList.remove('active');
+  document.getElementById(cardId).classList.add('done');
+}
+
+function actualizarResumen() {
+  const el = document.getElementById('resumenCarga');
+  if (!S.bib && !S.koha) { el.textContent = 'Esperando archivos…'; return; }
+  let txt = '';
+  if (S.bib) {
+    const ws = S.bib.Sheets[S.bib.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null });
+    const libros = rows.slice(1).filter(r => r[0] || r[1]).filter(r => !r[5]); // col F vacía
+    txt += `📋 ${libros.length} libros en bibliografía`;
+  }
+  if (S.koha) {
+    const ws = S.koha.Sheets[S.koha.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null });
+    txt += (txt ? '\n' : '') + `📊 ${rows.length - 1} registros KOHA`;
+  }
+  el.innerHTML = txt.replace(/\n/g,'<br>');
+  document.getElementById('card3').classList.add('active');
+}
+
+// Drag & drop
+['dz1','dz2'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.classList.remove('drag-over');
+    const tipo = id === 'dz1' ? 'bib' : 'koha';
+    const inp = el.querySelector('input');
+    const dt = new DataTransfer(); dt.items.add(e.dataTransfer.files[0]);
+    inp.files = dt.files; cargar({ target: inp }, tipo);
+  });
+});
+
+function selModo(val, el) {
+  document.querySelectorAll('.modo-opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  document.querySelector(`input[value="${val}"]`).checked = true;
+}
+
+// ─── Normalización de texto ──────────────────────────────────────
+function normalizar(texto) {
+  return String(texto || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar tildes
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function palabras(texto, minLen = 3) {
+  return new Set(normalizar(texto).split(' ').filter(w => w.length >= minLen));
+}
+
+function similitud(a, b) {
+  // a = título KOHA (corto), b = referencia bibliográfica APA (larga)
+  // Medimos qué % de las palabras del título KOHA aparecen en la referencia
+  const pa = palabras(a, 3), pb = palabras(b, 3);
+  if (!pa.size || !pb.size) return 0;
+  const inter = [...pa].filter(w => pb.has(w)).length;
+  return inter / pa.size; // cobertura direccional: corto sobre largo
+}
+
+// ─── Análisis principal ──────────────────────────────────────────
+function analizar() {
+  const btn = document.getElementById('btnRun');
+  btn.classList.add('loading'); btn.disabled = true;
+  setTimeout(() => { try { _analizar(); } catch(e) { alert('Error: ' + e.message); }
+    btn.classList.remove('loading'); btn.disabled = false; }, 80);
+}
+
+function _analizar() {
+  const umbral = parseInt(document.getElementById('umbral').value) / 100;
+  const modoAmplio = document.querySelector('input[name="modo"]:checked').value === 'amplio';
+
+  // ── Leer bibliografía (solo libros: col F vacía) ──────────────
+  const wsBib = S.bib.Sheets[S.bib.SheetNames[0]];
+  const rawBib = XLSX.utils.sheet_to_json(wsBib, { header:1, defval:null });
+  // Formato planilla limpia: [tipo, ref, UA, OUA, online, articulo, obs]
+  const libros = rawBib.slice(1)
+    .filter(r => r[1] && String(r[1]).trim())
+    .filter(r => !r[5] || !String(r[5]).trim()) // col F vacía = libro
+    .map(r => ({
+      tipo: String(r[0] || '').trim(),
+      ref:  String(r[1] || '').trim(),
+      ua:   parseFloat(r[2]) || 0,
+      oua:  parseFloat(r[3]) || 0,
+      online: r[4] ? String(r[4]).trim() : '',
+      obs:    r[6] ? String(r[6]).trim() : '',
+      prestamos: 0,
+      matchKoha: '',
+    }));
+
+  // ── Leer KOHA ────────────────────────────────────────────────
+  const wsKoha = S.koha.Sheets[S.koha.SheetNames[0]];
+  const rawKoha = XLSX.utils.sheet_to_json(wsKoha, { header:1, defval:null });
+  const hdrs = rawKoha[0].map(h => String(h || '').trim().toLowerCase());
+
+  // Detectar columnas por nombre
+  const iUA    = hdrs.findIndex(h => h.includes('unidad'));
+  const iCar   = hdrs.findIndex(h => h.includes('carrera'));
+  const iTit   = hdrs.findIndex(h => h.includes('título') || h.includes('titulo'));
+  const iAut   = hdrs.findIndex(h => h.includes('autor'));
+  const iTipo  = hdrs.findIndex(h => h.includes('tipo'));
+
+  // Excluir ítems que no son libros (notebooks, equipos, etc.)
+  const TIPOS_EXCLUIR = ['ntbk', 'notebook', 'equipo', 'laptop', 'computador'];
+  let kohaRows = rawKoha.slice(1).filter(r => {
+    if (!r[iTit] || !String(r[iTit]).trim()) return false;
+    if (iTipo !== -1 && r[iTipo]) {
+      const tipoNorm = normalizar(String(r[iTipo]));
+      if (TIPOS_EXCLUIR.some(t => tipoNorm.includes(t))) return false;
+    }
+    const titNorm = normalizar(String(r[iTit]));
+    if (TIPOS_EXCLUIR.some(t => titNorm.startsWith(t))) return false;
+    return true;
+  });
+
+  // Modo específico: usar todos los préstamos tal como vienen
+  // (el usuario ya filtró por carrera antes de cargar)
+  // Modo amplio: usar todo sin filtro adicional
+  // En ambos casos procesamos todos los registros cargados
+
+  // Agrupar préstamos KOHA por título+autor
+  const kohaMap = new Map(); // key: titulo norm → { titulo, autor, count }
+  kohaRows.forEach(r => {
+    const tit = String(r[iTit] || '').trim();
+    const aut = String(r[iAut] || '').trim();
+    const key = normalizar(tit + ' ' + aut).substring(0, 60);
+    if (!kohaMap.has(key)) kohaMap.set(key, { titulo: tit, autor: aut, count: 0, matched: false });
+    kohaMap.get(key).count++;
+  });
+
+  // ── Matching ──────────────────────────────────────────────────
+  const kohaEntries = [...kohaMap.values()];
+
+  libros.forEach(lib => {
+    let bestSim = 0, bestEntry = null;
+    kohaEntries.forEach(ke => {
+      // Similitud del título KOHA vs texto completo de referencia
+      const simTit = similitud(ke.titulo, lib.ref);
+      // Bonus si el autor también aparece en la referencia
+      const simAut = ke.autor ? similitud(ke.autor, lib.ref) * 0.3 : 0;
+      const sim = simTit + simAut;
+      if (sim > bestSim) { bestSim = sim; bestEntry = ke; }
+    });
+    if (bestSim >= umbral && bestEntry) {
+      lib.prestamos = bestEntry.count;
+      lib.matchKoha = bestEntry.titulo;
+      bestEntry.matched = true;
+    }
+  });
+
+  // ── Indicadores ───────────────────────────────────────────────
+  const conUso   = libros.filter(l => l.prestamos > 0);
+  const sinUso   = libros.filter(l => l.prestamos === 0);
+  const noMatch  = kohaEntries.filter(ke => !ke.matched).sort((a,b) => b.count - a.count);
+  const totalPrest = libros.reduce((s, l) => s + l.prestamos, 0);
+  const pctCob   = libros.length ? (conUso.length / libros.length * 100).toFixed(1) : 0;
+  const promedio = libros.length ? (totalPrest / libros.length).toFixed(1) : 0;
+
+  const periodo = document.getElementById('inputPeriodo').value.trim() || 'período';
+  const modoLabel = modoAmplio ? 'Colección total' : 'Específico por carrera';
+  document.getElementById('resMeta').textContent =
+    `${libros.length} libros bibliografía · ${kohaRows.length} registros KOHA · Período: ${periodo} · Modo: ${modoLabel}`;
+
+  // ── KPIs ──────────────────────────────────────────────────────
+  document.getElementById('kCob').textContent    = pctCob + '%';
+  document.getElementById('kCobSub').textContent = `${conUso.length} de ${libros.length} con al menos 1 préstamo`;
+  document.getElementById('kPrest').textContent  = totalPrest;
+  document.getElementById('kPrestSub').textContent = `Período ${periodo}`;
+  document.getElementById('kProm').textContent   = promedio;
+  document.getElementById('kPromSub').textContent = 'Promedio préstamos por libro bibliografía';
+  document.getElementById('kSinUso').textContent = sinUso.length;
+  document.getElementById('kSinUsoSub').textContent = `${(sinUso.length/libros.length*100).toFixed(1)}% del total sin registro`;
+
+  // ── Barra cobertura ───────────────────────────────────────────
+  document.getElementById('barFill').style.width  = pctCob + '%';
+  document.getElementById('barFill2').style.width = (100 - parseFloat(pctCob)) + '%';
+  document.getElementById('barPct').textContent   = pctCob + '%';
+  document.getElementById('barPct2').textContent  = (100 - parseFloat(pctCob)).toFixed(1) + '%';
+
+  // ── Top libros ────────────────────────────────────────────────
+  const tbody = document.getElementById('topBody');
+  tbody.innerHTML = '';
+  [...libros].sort((a,b) => b.prestamos - a.prestamos).slice(0, 20).forEach((l, i) => {
+    if (l.prestamos === 0) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${l.ref.substring(0,90)}${l.ref.length>90?'…':''}</td>
+      <td><span class="badge ${l.tipo==='obligatoria'?'badge-green':'badge-gray'}">${l.tipo||'—'}</span></td>
+      <td class="num"><strong>${l.prestamos}</strong></td>
+      <td class="num">${l.ua}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // ── Sin uso ───────────────────────────────────────────────────
+  const tbody2 = document.getElementById('sinUsoBody');
+  tbody2.innerHTML = '';
+  sinUso.slice(0, 30).forEach(l => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${l.ref.substring(0,90)}${l.ref.length>90?'…':''}</td>
+      <td><span class="badge ${l.tipo==='obligatoria'?'badge-green':'badge-gray'}">${l.tipo||'—'}</span></td>
+      <td class="num zero">${l.ua||0}</td>
+      <td class="num zero">${l.oua||0}</td>`;
+    tbody2.appendChild(tr);
+  });
+  if (sinUso.length > 30) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="4" style="color:var(--muted);font-style:italic">… y ${sinUso.length-30} más. Ver exportación Excel para lista completa.</td>`;
+    tbody2.appendChild(tr);
+  }
+
+  // ── No emparejados ────────────────────────────────────────────
+  const tbody3 = document.getElementById('noMatchBody');
+  tbody3.innerHTML = '';
+  noMatch.slice(0, 20).forEach(ke => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${ke.titulo.substring(0,70)}${ke.titulo.length>70?'…':''}</td>
+      <td style="color:var(--muted)">${ke.autor.substring(0,40)}</td>
+      <td class="num">${ke.count}</td>`;
+    tbody3.appendChild(tr);
+  });
+
+  // Guardar para exportación
+  S.resultados = { libros, noMatch, totalPrest, pctCob, promedio, conUso, sinUso, periodo };
+
+  // Alertas
+  alerta('aOk', `✓ Análisis completado`,
+    [`${conUso.length} libros con préstamos · ${sinUso.length} sin uso · ${noMatch.length} registros KOHA sin match en bibliografía`]);
+  if (noMatch.length > libros.length * 0.5) {
+    alerta('aWarn', `⚠ ${noMatch.length} registros KOHA sin match en bibliografía`,
+      ['Estos son libros prestados que no forman parte de la bibliografía del programa — es esperable en reportes del instituto completo. Si crees que faltan matches, prueba bajando el umbral de similitud.']);
+  }
+
+  document.getElementById('results').classList.add('show');
+  setTimeout(() => document.getElementById('results').scrollIntoView({ behavior:'smooth', block:'start' }), 100);
+}
+
+// ─── Alertas ─────────────────────────────────────────────────────
+function alerta(id, titulo, items) {
+  const el = document.getElementById(id);
+  el.innerHTML = `<strong>${titulo}</strong>${items.length > 1
+    ? '<ul>' + items.map(i => `<li>${i}</li>`).join('') + '</ul>'
+    : items[0] || ''}`;
+  el.classList.add('show');
+}
+
+// ─── Exportar Excel ───────────────────────────────────────────────
+function exportar() {
+  if (!S.resultados) return;
+  const { libros, noMatch } = S.resultados;
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1: todos los libros con préstamos
+  const h1 = [['Tipo','Referencia','UA','OUA','Préstamos','Match KOHA']];
+  libros.sort((a,b) => b.prestamos - a.prestamos).forEach(l =>
+    h1.push([l.tipo, l.ref, l.ua, l.oua, l.prestamos, l.matchKoha]));
+  const ws1 = XLSX.utils.aoa_to_sheet(h1);
+  ws1['!cols'] = [{wch:15},{wch:80},{wch:6},{wch:6},{wch:12},{wch:50}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Uso_por_libro');
+
+  // Hoja 2: KOHA sin match
+  const h2 = [['Título KOHA','Autor','Préstamos']];
+  noMatch.forEach(ke => h2.push([ke.titulo, ke.autor, ke.count]));
+  const ws2 = XLSX.utils.aoa_to_sheet(h2);
+  ws2['!cols'] = [{wch:60},{wch:40},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'KOHA_sin_match');
+
+  const ts = (S.resultados.periodo || new Date().toISOString().slice(0,10)).replace(/[^a-zA-Z0-9\-]/g,'_');
+  XLSX.writeFile(wb, `Analisis_Uso_${ts}.xlsx`);
+}
+</script>
+</body>
+</html>
